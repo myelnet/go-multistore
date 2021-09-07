@@ -1,4 +1,4 @@
-module github.com/filecoin-project/go-multistore
+module github.com/myelnet/go-multistore
 
 go 1.14
 

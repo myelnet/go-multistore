@@ -15,7 +15,7 @@ You may want to familiarize yourself with various IPFS storage layer components:
 
 ## Installation
 ```bash
-go get "github.com/filecoin-project/go-multistore"`
+go get "github.com/myelnet/go-multistore"`
 ```
 
 ## Usage

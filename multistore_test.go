@@ -4,11 +4,11 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/filecoin-project/go-multistore"
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/query"
 	dss "github.com/ipfs/go-datastore/sync"
+	"github.com/myelnet/go-multistore"
 	"github.com/stretchr/testify/require"
 )
 
