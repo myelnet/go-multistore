@@ -16,13 +16,13 @@ type multiReadBs struct {
 	mds *MultiStore
 }
 
-func (m *multiReadBs) Has(cid cid.Cid) (bool, error) {
+func (m *multiReadBs) Has(ctx context.Context, cid cid.Cid) (bool, error) {
 	m.mds.lk.RLock()
 	defer m.mds.lk.RUnlock()
 
 	var merr error
 	for i, store := range m.mds.open {
-		has, err := store.Bstore.Has(cid)
+		has, err := store.Bstore.Has(ctx, cid)
 		if err != nil {
 			merr = multierror.Append(merr, xerrors.Errorf("has (ds %d): %w", i, err))
 			continue
@@ -37,13 +37,13 @@ func (m *multiReadBs) Has(cid cid.Cid) (bool, error) {
 	return false, merr
 }
 
-func (m *multiReadBs) Get(cid cid.Cid) (blocks.Block, error) {
+func (m *multiReadBs) Get(ctx context.Context, cid cid.Cid) (blocks.Block, error) {
 	m.mds.lk.RLock()
 	defer m.mds.lk.RUnlock()
 
 	var merr error
 	for i, store := range m.mds.open {
-		has, err := store.Bstore.Has(cid)
+		has, err := store.Bstore.Has(ctx, cid)
 		if err != nil {
 			merr = multierror.Append(merr, xerrors.Errorf("has (ds %d): %w", i, err))
 			continue
@@ -52,7 +52,7 @@ func (m *multiReadBs) Get(cid cid.Cid) (blocks.Block, error) {
 			continue
 		}
 
-		val, err := store.Bstore.Get(cid)
+		val, err := store.Bstore.Get(ctx, cid)
 		if err != nil {
 			merr = multierror.Append(merr, xerrors.Errorf("get (ds %d): %w", i, err))
 			continue
@@ -68,19 +68,19 @@ func (m *multiReadBs) Get(cid cid.Cid) (blocks.Block, error) {
 	return nil, merr
 }
 
-func (m *multiReadBs) DeleteBlock(cid cid.Cid) error {
+func (m *multiReadBs) DeleteBlock(ctx context.Context, cid cid.Cid) error {
 	return xerrors.Errorf("operation not supported")
 }
 
-func (m *multiReadBs) GetSize(cid cid.Cid) (int, error) {
+func (m *multiReadBs) GetSize(ctx context.Context, cid cid.Cid) (int, error) {
 	return 0, xerrors.Errorf("operation not supported")
 }
 
-func (m *multiReadBs) Put(block blocks.Block) error {
+func (m *multiReadBs) Put(ctx context.Context, block blocks.Block) error {
 	return xerrors.Errorf("operation not supported")
 }
 
-func (m *multiReadBs) PutMany(blocks []blocks.Block) error {
+func (m *multiReadBs) PutMany(ctx context.Context, blocks []blocks.Block) error {
 	return xerrors.Errorf("operation not supported")
 }
 

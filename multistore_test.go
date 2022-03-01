@@ -1,6 +1,7 @@
 package multistore_test
 
 import (
+	"context"
 	"math/rand"
 	"testing"
 
@@ -13,26 +14,27 @@ import (
 )
 
 func TestMultistore(t *testing.T) {
+	ctx := context.Background()
 
 	ds := dss.MutexWrap(datastore.NewMapDatastore())
-	multiDS, err := multistore.NewMultiDstore(ds)
+	multiDS, err := multistore.NewMultiDstore(ctx, ds)
 	require.NoError(t, err)
 
 	var stores []*multistore.Store
 	for i := 0; i < 5; i++ {
 		next := multiDS.Next()
-		store, err := multiDS.Get(next)
+		store, err := multiDS.Get(ctx, next)
 		require.NoError(t, err)
 		stores = append(stores, store)
 		blks := generateBlocksOfSize(5, 100)
 		for _, block := range blks {
-			err := store.Bstore.Put(block)
+			err := store.Bstore.Put(ctx, block)
 			require.NoError(t, err)
 		}
 	}
 
 	t.Run("creates all keys", func(t *testing.T) {
-		qres, err := ds.Query(query.Query{KeysOnly: true})
+		qres, err := ds.Query(ctx, query.Query{KeysOnly: true})
 		require.NoError(t, err)
 		all, err := qres.Rest()
 		require.NoError(t, err)
@@ -45,7 +47,7 @@ func TestMultistore(t *testing.T) {
 		require.Equal(t, multistore.StoreIDList{1, 2, 3, 4, 5}, storeIndexes)
 
 		// getting a second time does not make a new store
-		_, err := multiDS.Get(3)
+		_, err := multiDS.Get(ctx, 3)
 		require.NoError(t, err)
 		storeIndexes = multiDS.List()
 		require.Len(t, storeIndexes, 5)
@@ -53,12 +55,12 @@ func TestMultistore(t *testing.T) {
 	})
 
 	t.Run("delete stores", func(t *testing.T) {
-		multiDS.Delete(4)
+		multiDS.Delete(ctx, 4)
 		storeIndexes := multiDS.List()
 		require.Len(t, storeIndexes, 4)
 		require.Equal(t, multistore.StoreIDList{1, 2, 3, 5}, storeIndexes)
 
-		qres, err := ds.Query(query.Query{KeysOnly: true})
+		qres, err := ds.Query(ctx, query.Query{KeysOnly: true})
 		require.NoError(t, err)
 		all, err := qres.Rest()
 		require.NoError(t, err)
@@ -68,7 +70,7 @@ func TestMultistore(t *testing.T) {
 	t.Run("close/reopen", func(t *testing.T) {
 		err := multiDS.Close()
 		require.NoError(t, err)
-		newMultiDS, err := multistore.NewMultiDstore(ds)
+		newMultiDS, err := multistore.NewMultiDstore(ctx, ds)
 
 		storeIndexes := newMultiDS.List()
 		require.Len(t, storeIndexes, 4)

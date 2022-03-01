@@ -1,6 +1,7 @@
 package multistore
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -34,8 +35,8 @@ var dsMultiKey = datastore.NewKey("/multi")
 
 // NewMultiDstore returns a new instance of a MultiStore for the given datastore
 // instance
-func NewMultiDstore(ds datastore.Batching) (*MultiStore, error) {
-	listBytes, err := ds.Get(dsListKey)
+func NewMultiDstore(ctx context.Context, ds datastore.Batching) (*MultiStore, error) {
+	listBytes, err := ds.Get(ctx, dsListKey)
 	if xerrors.Is(err, datastore.ErrNotFound) {
 		listBytes, _ = json.Marshal(StoreIDList{})
 	} else if err != nil {
@@ -57,7 +58,7 @@ func NewMultiDstore(ds datastore.Batching) (*MultiStore, error) {
 			mds.next = i
 		}
 
-		_, err := mds.Get(i)
+		_, err := mds.Get(ctx, i)
 		if err != nil {
 			return nil, xerrors.Errorf("open store %d: %w", i, err)
 		}
@@ -75,7 +76,7 @@ func (mds *MultiStore) Next() StoreID {
 	return mds.next
 }
 
-func (mds *MultiStore) updateStores() error {
+func (mds *MultiStore) updateStores(ctx context.Context) error {
 	stores := make(StoreIDList, 0, len(mds.open))
 	for k := range mds.open {
 		stores = append(stores, k)
@@ -86,7 +87,7 @@ func (mds *MultiStore) updateStores() error {
 	if err != nil {
 		return xerrors.Errorf("could not marshal list: %w", err)
 	}
-	err = mds.ds.Put(dsListKey, listBytes)
+	err = mds.ds.Put(ctx, dsListKey, listBytes)
 	if err != nil {
 		return xerrors.Errorf("could not save stores list: %w", err)
 	}
@@ -94,7 +95,7 @@ func (mds *MultiStore) updateStores() error {
 }
 
 // Get returns the store for the given ID
-func (mds *MultiStore) Get(i StoreID) (*Store, error) {
+func (mds *MultiStore) Get(ctx context.Context, i StoreID) (*Store, error) {
 	mds.lk.Lock()
 	defer mds.lk.Unlock()
 
@@ -113,7 +114,7 @@ func (mds *MultiStore) Get(i StoreID) (*Store, error) {
 		return nil, xerrors.Errorf("could not open new store: %w", err)
 	}
 
-	err = mds.updateStores()
+	err = mds.updateStores(ctx)
 	if err != nil {
 		return nil, xerrors.Errorf("updating stores: %w", err)
 	}
@@ -136,7 +137,7 @@ func (mds *MultiStore) List() StoreIDList {
 }
 
 // Delete deletes the store with the given id, including all of its data
-func (mds *MultiStore) Delete(i StoreID) error {
+func (mds *MultiStore) Delete(ctx context.Context, i StoreID) error {
 	mds.lk.Lock()
 	defer mds.lk.Unlock()
 
@@ -150,35 +151,35 @@ func (mds *MultiStore) Delete(i StoreID) error {
 		return xerrors.Errorf("closing store: %w", err)
 	}
 
-	err = mds.updateStores()
+	err = mds.updateStores(ctx)
 	if err != nil {
 		return xerrors.Errorf("updating stores: %w", err)
 	}
 
-	qres, err := store.ds.Query(query.Query{KeysOnly: true})
+	qres, err := store.ds.Query(ctx, query.Query{KeysOnly: true})
 	if err != nil {
 		return xerrors.Errorf("query error: %w", err)
 	}
 	defer qres.Close() //nolint:errcheck
 
-	b, err := store.ds.Batch()
+	b, err := store.ds.Batch(ctx)
 	if err != nil {
 		return xerrors.Errorf("batch error: %w", err)
 	}
 
 	for r := range qres.Next() {
 		if r.Error != nil {
-			_ = b.Commit()
+			_ = b.Commit(ctx)
 			return xerrors.Errorf("iterator error: %w", err)
 		}
-		err := b.Delete(datastore.NewKey(r.Key))
+		err := b.Delete(ctx, datastore.NewKey(r.Key))
 		if err != nil {
-			_ = b.Commit()
+			_ = b.Commit(ctx)
 			return xerrors.Errorf("adding to batch: %w", err)
 		}
 	}
 
-	err = b.Commit()
+	err = b.Commit(ctx)
 	if err != nil {
 		return xerrors.Errorf("committing: %w", err)
 	}
